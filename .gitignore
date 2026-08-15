@@ -1,0 +1,9 @@
+.build/
+dist/
+.DS_Store
+*.xcodeproj
+.swiftpm/
+evidence/tmp/
+# Tokens y caches viven en ~/.sfcal/ (FUERA del repo). Jamas commitear credenciales.
+token-*.json
+*.log

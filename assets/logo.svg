@@ -1,0 +1,62 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- sfcal — icono de app. Paleta: nucleo.md (morado #8C27F1 chasis · oro #ff9101 protagonista
+       · fondos titanium). Concepto: el calendario oscuro donde HOY es la luz. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1c22"/>
+      <stop offset="1" stop-color="#0e0e13"/>
+    </linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9d3cf5"/>
+      <stop offset="1" stop-color="#7a1fd6"/>
+    </linearGradient>
+    <linearGradient id="goldcell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffac3d"/>
+      <stop offset="1" stop-color="#ff9101"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff9101" stop-opacity="0.5"/>
+      <stop offset="0.55" stop-color="#ff9101" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff9101" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tileclip">
+      <rect x="112" y="112" width="800" height="800" rx="180"/>
+    </clipPath>
+  </defs>
+
+  <!-- tile titanium -->
+  <rect x="112" y="112" width="800" height="800" rx="180" fill="url(#tile)"/>
+
+  <g clip-path="url(#tileclip)">
+    <!-- header morado (el chasis) -->
+    <rect x="112" y="112" width="800" height="212" fill="url(#head)"/>
+    <rect x="112" y="112" width="800" height="10" fill="#c79cff" opacity="0.45"/>
+    <!-- argollas del calendario -->
+    <rect x="304" y="76" width="44" height="150" rx="22" fill="#0e0e13"/>
+    <rect x="676" y="76" width="44" height="150" rx="22" fill="#0e0e13"/>
+    <!-- glow del HOY -->
+    <circle cx="597" cy="608" r="240" fill="url(#glow)"/>
+  </g>
+
+  <!-- grid de dias 4x3 (chasis muted) -->
+  <g fill="#2a2a31">
+    <rect x="192" y="410" width="130" height="108" rx="26"/>
+    <rect x="362" y="410" width="130" height="108" rx="26"/>
+    <rect x="532" y="410" width="130" height="108" rx="26"/>
+    <rect x="702" y="410" width="130" height="108" rx="26"/>
+    <rect x="192" y="554" width="130" height="108" rx="26"/>
+    <rect x="362" y="554" width="130" height="108" rx="26"/>
+    <rect x="702" y="554" width="130" height="108" rx="26"/>
+    <rect x="192" y="698" width="130" height="108" rx="26"/>
+    <rect x="362" y="698" width="130" height="108" rx="26"/>
+    <rect x="532" y="698" width="130" height="108" rx="26"/>
+  </g>
+
+  <!-- HOY: la celda de oro (la luz protagonista) -->
+  <rect x="532" y="554" width="130" height="108" rx="26" fill="url(#goldcell)"/>
+  <rect x="532" y="554" width="130" height="10" rx="5" fill="#ffd9a8" opacity="0.55"/>
+
+  <!-- borde del tile: luz superior, sombra inferior (titanium) -->
+  <rect x="112" y="112" width="800" height="800" rx="180" fill="none" stroke="#2c2c34" stroke-width="6"/>
+  <path d="M 330 115 H 694" stroke="#5a5a68" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+</svg>
