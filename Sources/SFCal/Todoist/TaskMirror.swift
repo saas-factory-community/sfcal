@@ -1,6 +1,6 @@
 import Foundation
 
-/// ESPEJO DE UNA VÍA Todoist → Google Calendar (principio de Daniel, 15 ago:
+/// ESPEJO DE UNA VÍA Todoist → Google Calendar (principio del diseño:
 /// "todo sincronizado" — la tarea debe verse en Google y por herencia en Apple).
 ///
 /// Reglas que evitan el monstruo del sync bidireccional (incidente Todoist↔Board):
@@ -45,8 +45,9 @@ final class TaskMirror {
         ]
         if t.hasTime {
             let tz = TimeZone.current.identifier
+            let dur = Double(t.durationMin ?? 30) * 60   // la duración REAL de la tarea
             body["start"] = ["dateTime": GDate.format(due), "timeZone": tz]
-            body["end"] = ["dateTime": GDate.format(due.addingTimeInterval(1800)), "timeZone": tz]
+            body["end"] = ["dateTime": GDate.format(due.addingTimeInterval(dur)), "timeZone": tz]
         } else {
             body["start"] = ["date": GDate.formatDay(due)]
             body["end"] = ["date": GDate.formatDay(DateKit.addDays(due, 1))]

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Pone sfcal.app en la POSICION 1 del Dock (idempotente).
+"""Pone sfcal.app en la POSICION 1 del Dock (retirando la Google Calendar.app casera).
 
 Via `defaults export/import` (pasa por cfprefsd: sin caches stale) + killall Dock.
 """
 import pathlib
 import plistlib
 import subprocess
+import sys
 
 HOME = pathlib.Path.home()
 SFCAL_URL = f"file://{HOME}/Applications/sfcal.app/"
+RETIRED_MARKER = "Google%20Calendar.app"
 
 def main():
     exported = subprocess.run(["defaults", "export", "com.apple.dock", "-"],
@@ -20,7 +22,7 @@ def main():
     def url_of(entry):
         return str(entry.get("tile-data", {}).get("file-data", {}).get("_CFURLString", ""))
 
-    apps = [a for a in apps if "sfcal.app" not in url_of(a)]
+    apps = [a for a in apps if RETIRED_MARKER not in url_of(a) and "sfcal.app" not in url_of(a)]
     entry = {
         "tile-data": {
             "file-data": {"_CFURLString": SFCAL_URL, "_CFURLStringType": 15},

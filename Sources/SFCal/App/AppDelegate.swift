@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 
@@ -21,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hScrollAccum: CGFloat = 0
     private var hScrollConsumed = false
     private var lastScrollAt: TimeInterval = 0
+    private var lastDayStepAt: TimeInterval = 0
+    private var themeCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         switch launchMode {
@@ -69,10 +72,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         window = w
+        // Semáforos CENTRADOS con el TopBar (simetría 16 ago): AppKit los pinta
+        // arriba; los bajamos al eje del renglón y re-aplicamos en cada evento
+        // que los resetea (resize, fullscreen, tema).
+        centerTrafficLights()
+        for name in [NSWindow.didResizeNotification,
+                     NSWindow.didBecomeKeyNotification,
+                     NSWindow.didEndLiveResizeNotification,
+                     NSWindow.didExitFullScreenNotification] {
+            NotificationCenter.default.addObserver(
+                forName: name, object: w, queue: .main) { [weak self] _ in
+                DispatchQueue.main.async { self?.centerTrafficLights() }
+            }
+        }
         store.start()
         installKeyMonitor()
         installScrollMonitor()
         registerLoginItemIfBundled()
+        // La APARIENCIA de NSApp sigue al tema: los popovers son ventanas nuevas
+        // que NO heredan el colorScheme de la vista — sin esto, en tema claro los
+        // controles del sistema (DatePicker, checkbox, placeholders) renderizaban
+        // OSCUROS sobre la card blanca (bug 16 ago).
+        applyAppearance(theme.isDark)
+        themeCancellable = theme.$isDark.sink { [weak self] dark in
+            self?.applyAppearance(dark)
+        }
+    }
+
+    private func applyAppearance(_ dark: Bool) {
+        NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
     }
 
     // MARK: - Scroll horizontal = navegar el periodo (mouse tilt / trackpad)
@@ -101,11 +129,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Solo gestos con dominancia horizontal clara; lo vertical pasa intacto al grid
         guard abs(dx) > abs(dy) * 1.4, abs(dx) > 0.4 else { return false }
+
+        // Tablero K / panel Y: SIN paneo de días — el gesto pasa intacto a la
+        // vista (el K tiene su propio ScrollView horizontal; tragarlo aquí dejaba la
+        // última columna inalcanzable, bug 16 ago)
+        if [.kanban, .tasks].contains(appState.mode) { return false }
         hScrollAccum += dx
-        // Trackpad (deltas precisos) pide un arrastre real; el tilt de mouse, un tick
+
+        // Vistas de tiempo: paneo GRADUAL por días con CONTROL (calibrado 15 ago pm:
+        // "ruedo poquito y me manda un chingo de días"). Tres frenos profesionales:
+        // umbral alto + UN día por tick + rate-limit 90ms entre días (girar rápido
+        // avanza ESTABLE ~10 días/s máx, jamás en ráfaga).
+        if [.day, .fourDay, .week].contains(appState.mode) {
+            // Calibración "lento y de a poquito" (afinada en uso real):
+            // varios ticks de rueda por día + máx ~5 días/seg sostenido
+            let perDay: CGFloat = event.hasPreciseScrollingDeltas ? 140 : 180
+            if abs(hScrollAccum) >= perDay, now - lastDayStepAt > 0.18 {
+                let dir = hScrollAccum < 0 ? 1 : -1
+                appState.scrollDays(dir)
+                lastDayStepAt = now
+                hScrollAccum += CGFloat(dir) * perDay
+                // El sobrante nunca guarda más de ~un día: cero ráfagas de arrastre
+                hScrollAccum = max(min(hScrollAccum, perDay * 0.9), -perDay * 0.9)
+            }
+            return true
+        }
+
+        // Resto de vistas (mes/año/agenda): un gesto = un periodo, como antes
         let threshold: CGFloat = event.hasPreciseScrollingDeltas ? 55 : 8
         if !hScrollConsumed && abs(hScrollAccum) > threshold {
-            hScrollConsumed = true   // un gesto (incluido su momentum) = UN paso
+            hScrollConsumed = true
             appState.step(hScrollAccum < 0 ? 1 : -1)
         }
         return true
@@ -128,7 +181,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
 
         if mods == [.command, .shift] && chars == "t" { theme.toggle(); return true }
+        if mods == [.command, .shift] && chars == "b" {   // ⇧⌘B = sidebar (16 ago;
+            // B como en VS Code)
+            withAnimation(.easeOut(duration: 0.15)) { appState.sidebarVisible.toggle() }
+            return true
+        }
         if mods == .command && chars == "n" { newEventNow(); return true }
+        if mods == .command {
+            switch chars {
+            case "+", "=": appState.zoomIn(); return true
+            case "-": appState.zoomOut(); return true
+            case "0": appState.zoomReset(); return true
+            default: break
+            }
+        }
         // Flechas traen .numericPad/.function; limpiarlos para tratar todo como bare key.
         // OJO: no se bloquea por "estar editando" — si un campo tiene el foco, el
         // check de first-responder de arriba ya nos sacó. Un guard extra de estado
@@ -145,7 +211,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return true
             }
             return false
-        case 53:                                    // esc: cierra drafts/edición, luego selección
+        case 53:                                    // esc: cierra detalle/drafts, luego selección
+            if appState.detailTaskId != nil {
+                appState.detailTaskId = nil
+                return true
+            }
             if appState.isEditingSomething {
                 appState.draft = nil
                 appState.taskDraft = nil
@@ -157,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: break
         }
 
-        // Esquema de Daniel (15 ago): 1-6 vistas · E evento · R tarea · T tema · H hoy
+        // Esquema keyboard-first: 1-6 vistas · E evento · R tarea · T tema · H hoy
         switch chars {
         case "1": appState.setMode(.year); return true
         case "2": appState.setMode(.month); return true
@@ -169,11 +239,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "r": newTaskDraft(); return true
         case "t": theme.toggle(); return true
         case "h": appState.goToday(); return true
+        case "y": appState.setMode(.tasks); return true      // Y = panel de tareas (16 ago)
+        case "k": appState.setMode(.kanban); return true     // K = Kanban de flujo (16 ago)
         // Aliases legacy (memoria muscular de Google Calendar)
         case "d": appState.setMode(.day); return true
         case "w": appState.setMode(.week); return true
-        case "m": appState.setMode(.month); return true
         default: return false
+        }
+    }
+
+    /// Baja los 3 botones estándar de la ventana para que su centro caiga en el
+    /// eje Y del TopBar (altura 46 → centro 23pt desde arriba). AppKit los
+    /// regresa a su lugar en varios eventos; los observers re-llaman esto.
+    private func centerTrafficLights() {
+        guard let w = window else { return }
+        let desiredCenterFromTop: CGFloat = 23
+        for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let btn = w.standardWindowButton(type), let sv = btn.superview else { continue }
+            let inWindow = sv.convert(btn.frame, to: nil)
+            let currentCenterFromTop = w.frame.height - inWindow.midY
+            let delta = desiredCenterFromTop - currentCenterFromTop
+            guard abs(delta) > 0.5 else { continue }
+            var f = btn.frame
+            f.origin.y += sv.isFlipped ? delta : -delta
+            btn.frame = f
         }
     }
 
@@ -193,8 +282,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func menuWeek() { appState.setMode(.week) }
     @objc private func menuMonth() { appState.setMode(.month) }
     @objc private func menuAgenda() { appState.setMode(.agenda) }
+    @objc private func menuTasks() { appState.setMode(.tasks) }
+    @objc private func menuKanban() { appState.setMode(.kanban) }
+    @objc private func menuToggleSidebar() {
+        withAnimation(.easeOut(duration: 0.15)) { appState.sidebarVisible.toggle() }
+    }
     @objc private func menuToday() { appState.goToday() }
     @objc private func menuTheme() { theme.toggle() }
+    @objc private func menuZoomIn() { appState.zoomIn() }
+    @objc private func menuZoomOut() { appState.zoomOut() }
+    @objc private func menuZoomReset() { appState.zoomReset() }
 
     private func newEventNow() {
         guard let cal = store.defaultWritableCalendar else { return }
@@ -242,12 +339,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                              ("4 días  (4)", #selector(menuFourDay)),
                              ("Día  (5)", #selector(menuDay)),
                              ("Agenda  (6)", #selector(menuAgenda)),
+                             ("Tareas  (Y)", #selector(menuTasks)),
+                             ("Flujo  (K)", #selector(menuKanban)),
                              ("Hoy  (H)", #selector(menuToday))] {
             let item = NSMenuItem(title: title, action: sel, keyEquivalent: "")
             item.target = self
             verMenu.addItem(item)
         }
         verMenu.addItem(.separator())
+        for (title, sel, key) in [("Acercar", #selector(menuZoomIn), "+"),
+                                  ("Alejar", #selector(menuZoomOut), "-"),
+                                  ("Tamaño real", #selector(menuZoomReset), "0")] {
+            let item = NSMenuItem(title: title, action: sel, keyEquivalent: key)
+            item.target = self
+            verMenu.addItem(item)
+        }
+        verMenu.addItem(.separator())
+        let sidebar = NSMenuItem(title: "Mostrar/ocultar calendarios",
+                                 action: #selector(menuToggleSidebar), keyEquivalent: "b")
+        sidebar.keyEquivalentModifierMask = [.command, .shift]
+        sidebar.target = self
+        verMenu.addItem(sidebar)
         let tema = NSMenuItem(title: "Alternar tema  (T)", action: #selector(menuTheme), keyEquivalent: "t")
         tema.keyEquivalentModifierMask = [.command, .shift]
         tema.target = self
@@ -328,6 +440,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runSnapshot(view: String, path: String, light: Bool) {
         NSApp.setActivationPolicy(.prohibited)
         theme.isDark = !light
+        appState.hourHeight = 60   // el canvas del snapshot asume el zoom default
         Task { @MainActor in
             _ = await store.syncOnceHeadless()
             switch view {
@@ -336,6 +449,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "year": appState.mode = .year
             case "4day": appState.mode = .fourDay
             case "agenda": appState.mode = .agenda
+            case "tasks": appState.mode = .tasks
+            case "kanban": appState.mode = .kanban
+            case "flujo": appState.mode = .kanban
+            case "rtask":
+                appState.mode = .week
+                appState.taskDraft = TaskDraft(day: Date())
             default: appState.mode = .week
             }
             appState.focusDate = Date()

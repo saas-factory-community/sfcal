@@ -96,6 +96,18 @@ struct Palette {
     )
 }
 
+extension Palette {
+    /// Colores de prioridad de Todoist (API: 4=p1 … 1=p4). El p4 usa el morado de casa.
+    func priorityColor(_ apiPriority: Int) -> Color {
+        switch apiPriority {
+        case 4: return Color(hex: "#d1453b")
+        case 3: return Color(hex: "#eb8909")
+        case 2: return Color(hex: "#246fe0")
+        default: return accent
+        }
+    }
+}
+
 @MainActor
 final class ThemeManager: ObservableObject {
     @Published var isDark: Bool {

@@ -28,8 +28,12 @@ Cliente de Google Calendar multi-cuenta con integración Todoist.
 3. **Tokens fuera de git** (viven en `~/.sfcal/`, chmod 600).
 4. Escritura optimista SIEMPRE con rollback visible (banner) si la API rechaza.
 5. Firmar el bundle (ad-hoc mínimo): sin firma, Gatekeeper re-escanea cada launch.
-6. Atajos: `1-6` vistas · `E` evento · `R` tarea · `T` tema · `H` hoy (bare keys via
+6. Atajos: `1-6` vistas · `Y` panel de tareas · `K` kanban · `E` evento · `R` tarea ·
+   `T` tema · `H` hoy · misma tecla = vista anterior · `⇧⌘B` sidebar (bare keys via
    NSEvent monitor con guardia de first-responder; no robar teclas al escribir).
+7. **El Kanban no inventa estado**: las columnas son SECCIONES de Todoist agregadas por
+   nombre entre proyectos (`TodoSection.canon`); "Hecho hoy" = completadas del día.
+   Drag & drop llama move/close/reopen reales. Cero estado local del tablero.
 
 ## Gotchas
 
@@ -38,3 +42,13 @@ Cliente de Google Calendar multi-cuenta con integración Todoist.
 - Instancias recurrentes: id `master_YYYYMMDD...`; PATCH edita SOLO esa instancia.
 - ImageRenderer no materializa ScrollView/LazyVStack → los snapshots usan stacks planos.
 - `.offset` no mueve layout: los anchors de scroll son views con posición real.
+- `.dropDestination`/`.draggable` NO se montan en modo snapshot: ImageRenderer pinta el
+  contenedor de drop con un fill amarillo + 🚫 gigante.
+- Un `TapGesture(count: 2)` en un CONTENEDOR retrasa el click sencillo de los botones hijos
+  (timeout de disambiguación ~0.5s). Los dobles clicks van en un background HERMANO.
+- Los popovers son ventanas aparte que NO heredan el colorScheme: `NSApp.appearance` se
+  sincroniza al tema in-app (sin eso, DatePickers/checkboxes salen del tema del sistema).
+- El monitor global de scroll solo panea en vistas de tiempo; en `K`/`Y` el gesto pasa
+  intacto (una vista nueva con scroll propio debe agregarse a esa lista).
+- Los semáforos de la ventana se re-centran por código (`centerTrafficLights`) porque AppKit
+  los resetea en resize/fullscreen.

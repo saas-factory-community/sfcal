@@ -184,3 +184,17 @@ final class TodoistDueTests: XCTestCase {
         XCTAssertNil(TodoistDue.parse("mañana"))
     }
 }
+
+final class SectionCanonTests: XCTestCase {
+    func testEmojiAndCaseCollapse() {
+        XCTAssertEqual(TodoSection.canon("💡 Ideas"), "ideas")
+        XCTAssertEqual(TodoSection.canon("IDEAS"), "ideas")
+    }
+    func testAccentsAndSpaces() {
+        XCTAssertEqual(TodoSection.canon("  Por Hacer "), "por hacer")
+        XCTAssertEqual(TodoSection.canon("HACIÉNDO"), "haciendo")
+    }
+    func testDistinctNamesStayDistinct() {
+        XCTAssertNotEqual(TodoSection.canon("Esperando"), TodoSection.canon("Haciendo"))
+    }
+}

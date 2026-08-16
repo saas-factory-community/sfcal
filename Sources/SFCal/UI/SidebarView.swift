@@ -8,13 +8,11 @@ struct SidebarView: View {
     var body: some View {
         let p = theme.palette
         VStack(alignment: .leading, spacing: 0) {
-            lockup
-                .padding(.top, 40)   // debajo de los semáforos de la ventana
-                .padding(.horizontal, 16)
-
+            // El lockup vive ahora en el TopBar (una sola línea con los semáforos,
+            // simetría 16 ago); el sidebar arranca directo con el mini-mes
             MiniMonthView()
                 .padding(.horizontal, 12)
-                .padding(.top, 14)
+                .padding(.top, 12)
 
             // VStack plano (no ScrollView): ImageRenderer no pinta contenido de ScrollView
             // y la lista es corta. Si algún día hay 30 calendarios, se revisa.
@@ -40,17 +38,6 @@ struct SidebarView: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(theme.palette.surface)
-    }
-
-    private var lockup: some View {
-        let p = theme.palette
-        return HStack(spacing: 8) {
-            LogoMark(size: 22)
-            Text("sfcal")
-                .font(.system(size: 16, weight: .heavy))
-                .foregroundStyle(p.textPrimary)
-                .tracking(0.2)
-        }
     }
 
     @ViewBuilder
@@ -237,10 +224,10 @@ struct MiniMonthView: View {
         }) {
             Text(DateKit.dayNum.string(from: day))
                 .font(.system(size: 9.5, weight: isToday ? .heavy : .medium))
-                .foregroundStyle(isToday ? Color(hex: "#09090b") : (inMonth ? p.textSecondary : p.textMuted.opacity(0.45)))
+                .foregroundStyle(isToday ? Color(hex: "#f7f8f8") : (inMonth ? p.textSecondary : p.textMuted.opacity(0.45)))
                 .frame(width: 20, height: 20)
                 .background(
-                    Circle().fill(isToday ? p.gold : .clear)
+                    Circle().fill(isToday ? p.accent : .clear)
                         .overlay(Circle().stroke(isFocus && !isToday ? p.accent.opacity(0.8) : .clear, lineWidth: 1.2))
                 )
                 .contentShape(Rectangle())

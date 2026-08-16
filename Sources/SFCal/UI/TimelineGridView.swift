@@ -9,7 +9,7 @@ struct TimelineGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var theme: ThemeManager
 
-    private let hourHeight: CGFloat = 60
+    private var hourHeight: CGFloat { appState.hourHeight }
     private let gutter: CGFloat = 56
 
     @State private var ghost: GhostDraft?
@@ -87,7 +87,7 @@ struct TimelineGridView: View {
                     .offset(x: gutter, y: y)
                 if h < Int(hourHi) {
                     Text(String(format: "%02d", h))
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: 11 * appState.fontScale, weight: .bold, design: .monospaced))
                         .foregroundStyle(p.textSecondary.opacity(0.75))
                         .frame(width: gutter - 14, alignment: .trailing)
                         .offset(x: 0, y: y - 6.5)
@@ -156,13 +156,14 @@ struct TimelineGridView: View {
                 LayoutItem(id: $0.id, start: max($0.start, dayStart), end: min($0.end, dayEnd))
             } + timedTasks.compactMap { t -> LayoutItem? in
                 guard let due = t.due else { return nil }
-                return LayoutItem(id: "task-\(t.id)", start: due, end: due.addingTimeInterval(1800))
+                let span = Double(max(t.durationMin ?? 30, 15)) * 60
+                return LayoutItem(id: "task-\(t.id)", start: due, end: due.addingTimeInterval(span))
             }
             let positions = OverlapLayout.layout(items)
             ForEach(timedTasks) { task in
                 if let due = task.due, let pos = positions["task-\(task.id)"] {
                     let y = (DateKit.minutesIntoDay(due) / 60 - hourLo) * hourHeight
-                    let h: CGFloat = 26
+                    let h = max(26, Double(task.durationMin ?? 30) / 60 * hourHeight - 1)
                     let subW = (colWidth - 4) / CGFloat(pos.columnCount)
                     let x = gutter + CGFloat(dayIdx) * colWidth + 2 + CGFloat(pos.column) * subW
                     if y + h > 0 && y < (hourHi - hourLo) * hourHeight {
@@ -218,29 +219,32 @@ struct TimelineGridView: View {
             let now = ctx.date
             let y = (DateKit.minutesIntoDay(now) / 60 - hourLo) * hourHeight
             if y >= 0, y <= (hourHi - hourLo) * hourHeight {
+                // MORADA y gruesa: saber dónde estás de un vistazo
                 ZStack(alignment: .topLeading) {
                     Rectangle()
-                        .fill(p.gold.opacity(0.28))
-                        .frame(width: max(0, width - gutter), height: 1)
-                        .offset(x: gutter, y: y)
+                        .fill(p.accent.opacity(0.5))
+                        .frame(width: max(0, width - gutter), height: 2)
+                        .offset(x: gutter, y: y - 0.5)
                     if let todayIdx = days.firstIndex(where: { DateKit.isToday($0) }) {
                         Rectangle()
-                            .fill(p.gold)
-                            .frame(width: colWidth, height: 2)
-                            .offset(x: gutter + CGFloat(todayIdx) * colWidth, y: y - 0.5)
+                            .fill(p.accent)
+                            .frame(width: colWidth, height: 3.5)
+                            .offset(x: gutter + CGFloat(todayIdx) * colWidth, y: y - 1.75)
+                            .shadow(color: p.accent.opacity(0.6), radius: 4)
                         Circle()
-                            .fill(p.gold)
-                            .frame(width: 7, height: 7)
-                            .offset(x: gutter + CGFloat(todayIdx) * colWidth - 3.5, y: y - 3)
+                            .fill(p.accent)
+                            .frame(width: 11, height: 11)
+                            .offset(x: gutter + CGFloat(todayIdx) * colWidth - 5.5, y: y - 5)
+                            .shadow(color: p.accent.opacity(0.7), radius: 5)
                     }
                     Text(DateKit.timeShort.string(from: now))
-                        .font(.system(size: 9, weight: .heavy, design: .monospaced))
-                        .foregroundStyle(p.gold)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1.5)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(p.bg))
-                        .frame(width: gutter - 10, alignment: .trailing)
-                        .offset(x: 0, y: y - 7)
+                        .font(.system(size: 9.5 * appState.fontScale, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(Color(hex: "#f7f8f8"))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(p.accent))
+                        .frame(width: gutter - 6, alignment: .trailing)
+                        .offset(x: 0, y: y - 8)
                 }
             }
         }
@@ -319,13 +323,14 @@ struct DayHeaderRow: View {
                 }) {
                     HStack(spacing: 6) {
                         Text(DateKit.weekdayShort.string(from: day).replacingOccurrences(of: ".", with: ""))
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 11 * appState.fontScale, weight: .semibold))
                             .foregroundStyle(today ? p.textPrimary : p.textMuted)
                         Text(DateKit.dayNum.string(from: day))
-                            .font(.system(size: 13, weight: .heavy))
-                            .foregroundStyle(today ? Color(hex: "#09090b") : p.textSecondary)
-                            .frame(width: 24, height: 24)
-                            .background(Circle().fill(today ? p.gold : .clear))
+                            .font(.system(size: 13 * appState.fontScale, weight: .heavy))
+                            .foregroundStyle(today ? Color(hex: "#f7f8f8") : p.textSecondary)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(today ? p.accent : .clear)
+                                .shadow(color: today ? p.accent.opacity(0.5) : .clear, radius: 4))
                     }
                     .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
@@ -345,8 +350,9 @@ struct AllDayRow: View {
     @EnvironmentObject var store: EventStore
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var theme: ThemeManager
+    @State private var expanded = false
 
-    private let maxPills = 3
+    private var maxPills: Int { expanded ? 99 : 3 }
 
     var body: some View {
         let p = theme.palette
@@ -373,12 +379,18 @@ struct AllDayRow: View {
                         ForEach(tasksByDay[i].prefix(taskRoom)) { task in
                             TaskPill(task: task)
                         }
-                        if overflow > 0 {
-                            Text("+\(overflow) más")
-                                .font(.system(size: 9.5, weight: .semibold))
-                                .foregroundStyle(p.textMuted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, 6)
+                        if overflow > 0 || (expanded && byDay[i].count + tasksByDay[i].count > 3) {
+                            Button(action: {
+                                withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
+                            }) {
+                                Text(expanded ? "− menos" : "+\(overflow) más")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundStyle(p.accent)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.leading, 6)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -400,7 +412,7 @@ struct AllDayRow: View {
             HStack(spacing: 5) {
                 Circle().fill(color).frame(width: 6, height: 6)
                 Text(event.summary)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 10.5 * appState.fontScale, weight: .semibold))
                     .foregroundStyle(Color.eventTitle(hex: hex, dark: p.isDark))
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -510,11 +522,11 @@ struct EventBlockView: View {
                 // Variante de una línea para bloques cortos: "Título  HH:mm"
                 HStack(spacing: 5) {
                     Text(displayTitle)
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .font(.system(size: 10.5 * appState.fontScale, weight: .semibold))
                         .foregroundStyle(titleColor)
                         .lineLimit(1)
                     Text(DateKit.timeShort.string(from: event.start))
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .font(.system(size: 9 * appState.fontScale, weight: .medium, design: .monospaced))
                         .foregroundStyle(p.textMuted)
                         .lineLimit(1)
                 }
@@ -523,11 +535,11 @@ struct EventBlockView: View {
             } else {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(displayTitle)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11 * appState.fontScale, weight: .semibold))
                         .foregroundStyle(titleColor)
                         .lineLimit(height > 46 ? 2 : 1)
                     Text(timeLabel)
-                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .font(.system(size: 9.5 * appState.fontScale, weight: .medium, design: .monospaced))
                         .foregroundStyle(p.textSecondary.opacity(0.85))
                         .lineLimit(1)
                 }

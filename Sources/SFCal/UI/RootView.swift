@@ -19,23 +19,60 @@ struct RootView: View {
 
     var body: some View {
         let p = theme.palette
-        HStack(alignment: .top, spacing: 0) {
-            SidebarView()
-                .frame(width: 236)
-            Rectangle()
-                .fill(p.border)
-                .frame(width: 1)
-            VStack(spacing: 0) {
-                HeaderBar()
-                HitosBand()
-                mainContent
+        // TopBar de ANCHO COMPLETO (simetría 16 ago): semáforos, logo y todos los
+        // controles en UNA sola línea; el sidebar y el contenido viven debajo.
+        VStack(spacing: 0) {
+            HeaderBar()
+            HStack(alignment: .top, spacing: 0) {
+                if appState.sidebarVisible {
+                    SidebarView()
+                        .frame(width: 236)
+                        .transition(.move(edge: .leading))
+                    Rectangle()
+                        .fill(p.border)
+                        .frame(width: 1)
+                }
+                VStack(spacing: 0) {
+                    HitosBand()
+                    mainContent
+                }
             }
         }
         .background(p.bg)
         .environment(\.colorScheme, p.isDark ? .dark : .light)
         .overlay(alignment: .bottom) { bannerView }
         .overlay { draftOverlay }
+        .overlay { detailOverlay }
         .ignoresSafeArea()
+    }
+
+    /// Overlay GLOBAL de detalle de tarea (reutiliza TaskDetailPane del panel Y):
+    /// cualquier vista lo abre con appState.detailTaskId. Esc / backdrop cierran.
+    @ViewBuilder
+    private var detailOverlay: some View {
+        let p = theme.palette
+        if let id = appState.detailTaskId {
+            ZStack {
+                Color.black.opacity(p.isDark ? 0.45 : 0.25)
+                    .contentShape(Rectangle())
+                    .onTapGesture { appState.detailTaskId = nil }
+                if let task = store.allTasks.first(where: { $0.id == id }) {
+                    TaskDetailPane(task: task) { appState.detailTaskId = nil }
+                        .id(task.id)
+                        .frame(width: 410, height: 560)
+                        .background(RoundedRectangle(cornerRadius: 13).fill(p.card))
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(p.border, lineWidth: 1))
+                        .shadow(color: .black.opacity(p.isDark ? 0.55 : 0.25), radius: 30, y: 10)
+                        .offset(y: -30)
+                } else {
+                    // La tarea se completó/eliminó con el panel abierto: cerrar solo
+                    Color.clear.onAppear { appState.detailTaskId = nil }
+                }
+            }
+            .transition(.opacity)
+            .animation(.easeOut(duration: 0.12), value: appState.detailTaskId)
+        }
     }
 
     /// Overlay central DETERMINISTA para los drafts de teclado (E evento, R tarea).
@@ -74,16 +111,19 @@ struct RootView: View {
 
     @ViewBuilder
     private var mainContent: some View {
+        // SIN .id() por fecha en las vistas de tiempo: forzar identidad nueva por día
+        // destruía y recreaba el grid entero en cada paso del paneo (el "parpadeo",
+        // 15 ago pm). Sin él, SwiftUI difea en su lugar: smooth, y el scroll vertical
+        // se conserva al navegar (comportamiento Google).
         switch appState.mode {
         case .day:
             TimelineGridView(days: [DateKit.startOfDay(appState.focusDate)])
-                .id("day-\(DateKit.startOfDay(appState.focusDate).timeIntervalSince1970)")
         case .fourDay:
             TimelineGridView(days: (0..<4).map { DateKit.addDays(DateKit.startOfDay(appState.focusDate), $0) })
-                .id("4day-\(DateKit.startOfDay(appState.focusDate).timeIntervalSince1970)")
         case .week:
-            TimelineGridView(days: DateKit.weekDays(appState.focusDate))
-                .id("week-\(DateKit.startOfWeek(appState.focusDate).timeIntervalSince1970)")
+            // Ventana RODANTE de 7 días desde focusDate: el scroll horizontal la
+            // desliza día a día; flechas/H/tecla 3 la dejan alineada a lunes
+            TimelineGridView(days: (0..<7).map { DateKit.addDays(DateKit.startOfDay(appState.focusDate), $0) })
         case .month:
             MonthView()
         case .year:
@@ -91,6 +131,10 @@ struct RootView: View {
         case .agenda:
             AgendaView()
                 .id("agenda-\(DateKit.startOfDay(appState.focusDate).timeIntervalSince1970)")
+        case .tasks:
+            TasksPanelView()
+        case .kanban:
+            KanbanView()
         }
     }
 
@@ -118,6 +162,60 @@ struct RootView: View {
     }
 }
 
+/// El lockup del TopBar usa el ICONO REAL de la app (el mismo .icns del Dock,
+/// leído del bundle) para que jamás vuelvan a divergir (reporte 16 ago: el
+/// dibujo custom del sidebar no coincidía con la barra de tareas). En el
+/// binario suelto de `swift run` (snapshots) no hay bundle → LogoMark.
+struct AppLockup: View {
+    @EnvironmentObject var theme: ThemeManager
+    var body: some View {
+        HStack(spacing: 8) {
+            if Bundle.main.bundleURL.pathExtension == "app" {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 26, height: 26)
+            } else {
+                LogoMark(size: 22)
+            }
+            Text("sfcal")
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(theme.palette.textPrimary)
+                .tracking(0.2)
+        }
+    }
+}
+
+/// Botón de icono del header con HOVER de verdad (fondo + borde al pasar,
+/// pedido 16 ago): un botón que no reacciona parece adorno.
+struct HeaderIconButton: View {
+    let symbol: String
+    var tint: Color
+    var help: String
+    let action: () -> Void
+    @EnvironmentObject var theme: ThemeManager
+    @State private var hover = false
+
+    var body: some View {
+        let p = theme.palette
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(hover ? p.textPrimary : tint)
+                .frame(width: 27, height: 27)
+                .background(RoundedRectangle(cornerRadius: 7)
+                    .fill(hover ? p.card : .clear))
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(hover ? p.border : .clear, lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.1), value: hover)
+    }
+}
+
 struct HeaderBar: View {
     @EnvironmentObject var store: EventStore
     @EnvironmentObject var appState: AppState
@@ -125,40 +223,76 @@ struct HeaderBar: View {
 
     var body: some View {
         let p = theme.palette
-        HStack(spacing: 10) {
-            HStack(spacing: 2) {
-                navButton("chevron.left") { appState.step(-1) }
-                navButton("chevron.right") { appState.step(1) }
+        // DOS segmentos (calibración 16 ago):
+        // el tramo sobre el sidebar lleva SU MISMO surface (columna blanca
+        // continua, sin hairline horizontal cruzándola) y contiene semáforos +
+        // lockup; el divisor vertical sube hasta el tope; el toggle y todo lo
+        // demás viven A LA DERECHA de esa línea, sobre el bg del contenido.
+        HStack(alignment: .top, spacing: 0) {
+            if appState.sidebarVisible {
+                HStack(spacing: 8) {
+                    Color.clear.frame(width: 58, height: 1)   // zona de los semáforos
+                    AppLockup()
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 12)
+                .frame(width: 236, height: 47)
+                .background(p.surface)
+                .transition(.move(edge: .leading))
+                Rectangle().fill(p.border).frame(width: 1, height: 47)
+            } else {
+                Color.clear.frame(width: 70, height: 1)       // solo los semáforos
             }
-            Button(action: { appState.goToday() }) {
-                Text("Hoy")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(p.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: 7).stroke(p.border, lineWidth: 1))
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    HeaderIconButton(symbol: "sidebar.leading",
+                                     tint: appState.sidebarVisible ? p.textSecondary : p.accent,
+                                     help: "Mostrar/ocultar calendarios (⇧⌘B)") {
+                        withAnimation(.easeOut(duration: 0.15)) { appState.sidebarVisible.toggle() }
+                    }
+                    HStack(spacing: 2) {
+                        HeaderIconButton(symbol: "chevron.left", tint: p.textSecondary,
+                                         help: "Anterior") { appState.step(-1) }
+                        HeaderIconButton(symbol: "chevron.right", tint: p.textSecondary,
+                                         help: "Siguiente") { appState.step(1) }
+                    }
+                    Button(action: { appState.goToday() }) {
+                        Text("Hoy")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(p.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(RoundedRectangle(cornerRadius: 7).stroke(p.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+
+                    titleView(palette: p)
+                        .padding(.leading, 4)
+
+                    Spacer()
+
+                    modeSwitcher
+                    themeButton
+                    avatarBadge(palette: p)
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, 14)
+                .frame(height: 46)
+                Rectangle().fill(p.border).frame(height: 1)
             }
-            .buttonStyle(.plain)
-
-            titleView(palette: p)
-                .padding(.leading, 4)
-
-            Spacer()
-
-            modeSwitcher
-            themeButton
-            avatarBadge(palette: p)
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 14)
-        .frame(height: 52)
-        .padding(.top, 8)   // aire para la barra de tráfico (fullSizeContentView)
-        .contentShape(Rectangle())
-        // Doble click en el header = zoom (estándar macOS; el titlebar transparente
-        // dejaba el gesto enterrado bajo el contenido). Los botones siguen ganando.
-        .gesture(TapGesture(count: 2).onEnded {
-            NSApp.keyWindow?.zoom(nil)
-        })
+        // Doble click en el VACÍO del header = zoom. Vive en un BACKGROUND
+        // (hermano de los controles), jamás en el contenedor: un TapGesture(2)
+        // en el ancestro obliga a esperar el timeout de doble click antes de
+        // entregar el click a los botones hijos — era la latencia que se
+        // sentía en el botón del sidebar y no en el atajo (cazado 16 ago).
+        .background(
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(TapGesture(count: 2).onEnded {
+                    NSApp.keyWindow?.zoom(nil)
+                })
+        )
     }
 
     /// "Agosto" bold + "2026" light: el contraste tipográfico que separa un título
@@ -193,18 +327,6 @@ struct HeaderBar: View {
             .background(Circle().fill(p.card))
             .overlay(Circle().stroke(p.accent.opacity(0.65), lineWidth: 1.3))
             .help(emails.isEmpty ? "Sin cuentas" : emails.joined(separator: " + "))
-    }
-
-    private func navButton(_ symbol: String, action: @escaping () -> Void) -> some View {
-        let p = theme.palette
-        return Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(p.textSecondary)
-                .frame(width: 26, height: 26)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var modeSwitcher: some View {

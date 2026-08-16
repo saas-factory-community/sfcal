@@ -55,9 +55,10 @@ struct MonthView: View {
                 Spacer()
                 Text(DateKit.dayNum.string(from: day))
                     .font(.system(size: 11.5, weight: today ? .heavy : .semibold))
-                    .foregroundStyle(today ? Color(hex: "#09090b") : (inMonth ? p.textSecondary : p.textMuted.opacity(0.4)))
+                    .foregroundStyle(today ? Color(hex: "#f7f8f8") : (inMonth ? p.textSecondary : p.textMuted.opacity(0.4)))
                     .frame(width: 22, height: 22)
-                    .background(Circle().fill(today ? p.gold : .clear))
+                    .background(Circle().fill(today ? p.accent : .clear)
+                        .shadow(color: today ? p.accent.opacity(0.5) : .clear, radius: 3))
             }
             .padding(.trailing, 4)
             .padding(.top, 3)
@@ -70,10 +71,18 @@ struct MonthView: View {
                     .padding(.horizontal, 3)
             }
             if overflow > 0 {
-                Text("+\(overflow) más")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(p.textMuted)
-                    .padding(.leading, 5)
+                // Best practice de mes (Google): el overflow abre el DÍA completo
+                Button(action: {
+                    appState.focusDate = day
+                    appState.setMode(.day)
+                }) {
+                    Text("+\(overflow) más")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(p.accent)
+                        .padding(.leading, 5)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             Spacer(minLength: 0)
         }

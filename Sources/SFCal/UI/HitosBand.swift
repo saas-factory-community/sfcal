@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// La banda de HITOS: objetivos de mes/semana/día (calendarios "Objetivo ..."),
-/// la forma en que Daniel planifica por niveles. Prominente, no enterrada.
+/// planificación por niveles (Objetivo del día/semana/mes). Prominente, no enterrada.
 struct HitosBand: View {
     @EnvironmentObject var store: EventStore
     @EnvironmentObject var appState: AppState
@@ -31,12 +31,12 @@ struct HitosBand: View {
 
     /// Mismo lenguaje visual que un bloque de evento (fill tintado + barra de color,
     /// sin outline) — crítico round 2 — pero la banda mantiene su posición prominente:
-    /// el spec la exige elevada (la planificación por niveles de Daniel).
+    /// el spec la exige elevada (la planificación por niveles).
     private func chip(nivel: String, text: String, palette p: Palette) -> some View {
         let tint = nivel == "DÍA" ? p.gold : p.accent
         return HStack(spacing: 0) {
             // Altura FIJA: un Shape sin height es greedy y en vista Mes el VStack
-            // le repartía media pantalla al chip (bug 15 ago, reporte de Daniel)
+            // le repartía media pantalla al chip (bug 15 ago)
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(tint)
                 .frame(width: 3, height: 15)

@@ -12,13 +12,26 @@ lag: cliente directo de Google Calendar con integración de Todoist.
 
 - **Cliente nativo de Google Calendar** (N cuentas, todos tus calendarios con sus colores).
   Google sigue siendo tu hub: lo que hagas aquí se sincroniza a tu iPhone/Apple Calendar solo.
-- **6 vistas**: Año · Mes · Semana · 4 días · Día · Agenda.
-- **Keyboard-first**: `1-6` cambian de vista · `E` nuevo evento · `R` nueva tarea · `T` tema
-  oscuro/claro · `H` hoy · flechas o **scroll horizontal** navegan · drag para mover/estirar
-  eventos (snap de 15 min) · doble click en el grid crea.
-- **Todoist integrado**: tus tareas aparecen en el calendario (bloques punteados), las completas
-  desde ahí, capturas nuevas con `R`, y un **espejo de una vía** las proyecta a un calendario
-  "Tareas · Todoist" en Google para que también vivan en tu iPhone.
+- **8 vistas**: Año · Mes · Semana · 4 días · Día · Agenda · **panel de Tareas (`Y`)** ·
+  **tablero Kanban (`K`)**.
+- **Keyboard-first**: `1-6` cambian de vista · `Y` tareas · `K` tablero · `E` nuevo evento ·
+  `R` nueva tarea · `T` tema oscuro/claro · `H` hoy · **la misma tecla repetida regresa a la
+  vista anterior** · `⇧⌘B` esconde/muestra el sidebar · `⌘+`/`⌘-`/`⌘0` zoom (densidad horaria
+  + tipografía del grid) · flechas o **scroll horizontal gradual** (día a día, calibrado para
+  sentirse perilla, no resbaladilla) · drag para mover/estirar eventos (snap de 15 min) ·
+  doble click en el grid crea · doble click en el vacío del header maximiza.
+- **Todoist integrado a fondo**: tus tareas aparecen en el calendario (bloques punteados con
+  color de prioridad), las completas con un click al circulito, capturas nuevas con `R`
+  (proyecto, prioridad, etiquetas, descripción, duración), y un **espejo de una vía** las
+  proyecta a un calendario "Tareas · Todoist" en Google para que también vivan en tu iPhone.
+- **Panel de Tareas (`Y`)**: TODAS tus tareas activas (incluidas las sin fecha) en buckets
+  Vencidas/Hoy/Mañana/Próximos 7 días/Después/Sin fecha; click abre un editor completo estilo
+  Todoist (título, descripción, fecha/hora, duración, prioridad, etiquetas).
+- **Kanban de flujo (`K`)**: Backlog · Por hacer · **Haciendo con límite WIP 1** (el header
+  grita en rojo si metes dos: el punto del kanban personal es el límite, no las columnas) ·
+  Hecho hoy (se vacía al amanecer: marcador del día, no archivo). El estado vive en las
+  SECCIONES de Todoist (drag & drop = move/close/reopen reales por API), así que tu teléfono
+  ve el mismo tablero en la vista Tablero de cada proyecto.
 - **Sync incremental** cada 10s con syncToken (cambios de otros lados aparecen solos) +
   escritura optimista con rollback visible si Google rechaza.
 - **Banda de HITOS**: los eventos all-day de calendarios cuyo nombre empiece con "Objetivo"
@@ -51,7 +64,8 @@ https://github.com/saas-factory-community/sfcal
 6. Compila e instala: ./scripts/package.sh — queda en ~/Applications/sfcal.app,
    firmada y con arranque al login. Ponla en el Dock: python3 scripts/dock_position1.py
 7. Ábrela, verifica que se ven mis calendarios, y termina enseñándome los
-   atajos: 1-6 vistas, E evento, R tarea, T tema, H hoy, scroll horizontal.
+   atajos: 1-6 vistas, Y panel de tareas, K tablero kanban, E evento, R tarea,
+   T tema, H hoy, ⇧⌘B sidebar, ⌘+/- zoom, scroll horizontal gradual.
 ```
 
 ## Instalación manual

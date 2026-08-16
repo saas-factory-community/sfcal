@@ -51,19 +51,20 @@ struct AgendaView: View {
             HStack(spacing: 8) {
                 Text(DateKit.dayNum.string(from: day))
                     .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(today ? Color(hex: "#09090b") : p.textPrimary)
+                    .foregroundStyle(today ? Color(hex: "#f7f8f8") : p.textPrimary)
                     .frame(width: 27, height: 27)
-                    .background(Circle().fill(today ? p.gold : p.card))
+                    .background(Circle().fill(today ? p.accent : p.card)
+                        .shadow(color: today ? p.accent.opacity(0.5) : .clear, radius: 3))
                 Text(DateKit.cap(DateKit.agendaDay.string(from: day)))
                     .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(today ? p.gold : p.textSecondary)
+                    .foregroundStyle(today ? p.accent : p.textSecondary)
                 if today {
                     Text("HOY")
                         .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
-                        .foregroundStyle(p.gold)
+                        .foregroundStyle(p.accent)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
-                        .background(Capsule().fill(p.gold.opacity(0.15)))
+                        .background(Capsule().fill(p.accent.opacity(0.15)))
                 }
                 Spacer()
             }

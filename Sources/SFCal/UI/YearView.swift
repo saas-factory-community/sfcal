@@ -102,9 +102,9 @@ struct YearView: View {
             VStack(spacing: 2.5) {
                 Text(DateKit.dayNum.string(from: day))
                     .font(.system(size: 11.5, weight: today ? .heavy : .medium))
-                    .foregroundStyle(today ? Color(hex: "#09090b") : p.textSecondary)
+                    .foregroundStyle(today ? Color(hex: "#f7f8f8") : p.textSecondary)
                     .frame(width: 23, height: 23)
-                    .background(Circle().fill(today ? p.gold : .clear))
+                    .background(Circle().fill(today ? p.accent : .clear))
                 Circle()
                     .fill(busy ? p.accent.opacity(0.85) : .clear)
                     .frame(width: 3.5, height: 3.5)
